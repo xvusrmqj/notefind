@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from langchain_openai import OpenAIEmbeddings
 
-QUERY_PREFIX = "query: "
+# Qwen3-Embedding 指令格式：Instruct 描述任务，Query 为查询内容（大写 Q，必需）
+INSTRUCT = "Given a note search query, retrieve relevant note chunks that answer the query"
+QUERY_PREFIX = f"Instruct: {INSTRUCT}\nQuery: "
 
 
 def make_embedder(base_url: str, model: str, api_key: str) -> OpenAIEmbeddings:
