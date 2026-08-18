@@ -19,6 +19,9 @@ EXTENSIONS: dict[str, tuple[str, ...]] = {
 # 跳过的目录名
 SKIP_DIRS = {".git", ".obsidian", ".trash", "node_modules", ".logseq", ".smart-env"}
 
+# 跳过的文件名模式（画板/附件元数据，无检索价值）
+SKIP_NAME_PARTS = (".excalidraw", ".canvas")
+
 
 @dataclass
 class ScannedFile:
@@ -49,6 +52,8 @@ def scan_dir(note_dir: NoteDir) -> list[ScannedFile]:
         if not p.is_file():
             continue
         if any(part in SKIP_DIRS for part in p.parts):
+            continue
+        if any(part in p.name.lower() for part in SKIP_NAME_PARTS):
             continue
         if p.suffix.lower() not in exts:
             continue

@@ -1,38 +1,87 @@
-项目名称： notefind
-使用RAG技术将本地笔记本嵌入到postgres中，支持一切离线文档的embedding, 如logseq, zim wiki, obsidian. 支持自然语言搜索。
+# notefind
 
-已有本地chat llm model
+使用 RAG 技术将本地笔记本（zim / obsidian / logseq / markdown）向量化存入 PostgreSQL (pgvector)，
+支持自然语言搜索与 LLM 问答，全程本地运行。
+
+## 使用说明
+
+### 1. 前置条件
+
+- Python >= 3.11
+- PostgreSQL（安装 `pgvector` 扩展）
+- 本地 LLM 服务（OpenAI 兼容接口，默认 `http://localhost:8317/v1`）
+- 本地 Embedding 服务（OpenAI 兼容接口，默认 `http://localhost:11434/v1`，如 Ollama）
+
+### 2. 安装
+
 ```sh
-curl --request post \
-  --url http://localhost:8317/v1/chat/completions \
-  --header 'Authorization: Bearer your-api-key-1' \
-  --header 'Content-Type: application/json' \
-  --data '{
-  "model": "glm-5.1",
-  "messages": [
-    {
-      "role": "user",
-      "content": "Hello!"
-    }
-  ]
-}'
+uv sync
 ```
 
-已有本地embedding llm model
-```sh
-curl --request POST \
-  --url http://localhost:11434/v1/embeddings \
-  --header 'Content-Type: application/json' \
-  --data '{
-  "model": "qwen3-embedding:0.6b",
-  "input": [
-    "First sentence",
-    "Second sentence",
-    "Third sentence"
-  ]
-}'
+> 后续所有命令（CLI 和 scripts/ 下的脚本）都通过 uv 运行：`uv run notefind ...`、`uv run python scripts/xxx.py`，无需激活 venv
+
+### 3. 配置
+
+在项目根目录创建 `.env` 文件（或直接使用环境变量）：
+
+```dotenv
+# 数据库连接（需已安装 pgvector 扩展）
+DATABASE_URL=postgresql://notefind:123456@localhost:5432/notefind
+
+# Chat LLM（OpenAI 兼容）
+LLM_BASE_URL=http://localhost:8317/v1
+LLM_MODEL=glm-5.1
+LLM_API_KEY=your-api-key-1
+
+# Embedding 模型（OpenAI 兼容）
+EMBED_BASE_URL=http://localhost:11434/v1
+EMBED_MODEL=qwen3-embedding:0.6b
+EMBED_API_KEY=ollama
+
+# 笔记目录，格式: source_type:/abs/path，多个用逗号分隔
+# source_type 支持: zim / obsidian / logseq / markdown
+NOTE_DIRS=zim:/home/olv/Notes/zim,obsidian:/home/olv/Notes/vault
+
+# 可选
+TOP_K=10
+EMBED_BATCH_SIZE=32
 ```
 
+### 4. 初始化数据库
+
+```sh
+uv run python scripts/migrate_001.py   # 建表 + pgvector 索引
+uv run python scripts/check_schema.py  # 校验 schema
+```
+
+### 5. 同步笔记
+
+扫描笔记目录并增量入库（mtime 预过滤 + SHA-256 判断变化，只更新有变动的文件）：
+
+```sh
+uv run notefind sync
+```
+
+### 6. 提问
+
+自然语言检索 + LLM 回答，并附引用来源：
+
+```sh
+uv run notefind ask "部署流程里数据库备份是怎么做的？"
+```
+
+加 `--show-context` 同时显示检索到的原文片段：
+
+```sh
+uv run notefind ask "部署流程里数据库备份是怎么做的？" --show-context
+```
+
+### 7. 自检（可选）
+
+```sh
+uv run python scripts/selftest.py        # 端到端自检
+uv run python scripts/selftest_embed.py  # embedding 服务连通性自检
+```
 
 ## Roadmap
 
