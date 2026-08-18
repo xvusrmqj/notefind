@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 环境与密钥
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# 项目数据
+*.db

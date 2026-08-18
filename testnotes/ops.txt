@@ -1,0 +1,15 @@
+Content-Type: text/x-zim-wiki
+Wiki-Format: zim 0.6
+Creation-Date: 2026-01-01T10:00:00
+
+====== 运维手册 ======
+
+服务器日常运维记录。
+
+===== 备份策略 =====
+
+每天凌晨全量备份，每小时增量备份。
+
+===== 监控 =====
+
+使用 Prometheus + Grafana 监控 CPU、内存和磁盘。
