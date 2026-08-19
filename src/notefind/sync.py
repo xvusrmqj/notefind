@@ -162,7 +162,10 @@ def sync_all(settings: Settings, progress=None) -> SyncStats:
                     continue
 
                 vectors = embed_documents_batched(
-                    embedder, [c.content for c in chunks], settings.embed_batch_size
+                    embedder,
+                    [c.content for c in chunks],
+                    settings.embed_batch_size,
+                    settings.embed_pause_ms,
                 )
                 _upsert_document(
                     conn, sf, content_hash, chunks, vectors, row["id"] if row else None

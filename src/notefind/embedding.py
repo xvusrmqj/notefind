@@ -7,6 +7,8 @@ Qwen3-Embedding 为非对称检索模型：
 
 from __future__ import annotations
 
+import time
+
 from langchain_openai import OpenAIEmbeddings
 
 # Qwen3-Embedding 指令格式：Instruct 描述任务，Query 为查询内容（大写 Q，必需）
@@ -31,10 +33,18 @@ def embed_query(embedder: OpenAIEmbeddings, query: str) -> list[float]:
 
 
 def embed_documents_batched(
-    embedder: OpenAIEmbeddings, texts: list[str], batch_size: int
+    embedder: OpenAIEmbeddings,
+    texts: list[str],
+    batch_size: int,
+    pause_ms: int = 0,
 ) -> list[list[float]]:
-    """文档侧：不加前缀，批量 embedding。"""
+    """文档侧：不加前缀，批量 embedding。
+
+    pause_ms: 批间停顿（毫秒），CPU 推理时给散热留间隙，避免持续满载。
+    """
     vectors: list[list[float]] = []
     for i in range(0, len(texts), batch_size):
+        if i and pause_ms:
+            time.sleep(pause_ms / 1000)
         vectors.extend(embedder.embed_documents(texts[i : i + batch_size]))
     return vectors
