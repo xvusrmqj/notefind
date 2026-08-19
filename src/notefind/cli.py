@@ -6,6 +6,7 @@ import typer
 
 from .config import load_settings
 from .db import close_pool, init_pool
+from .retriever import RetrievalMode
 
 app = typer.Typer(help="notefind: 本地笔记 RAG 搜索", no_args_is_help=True)
 
@@ -35,14 +36,19 @@ def ask(
     show_context: bool = typer.Option(
         False, "--show-context", help="同时显示检索到的片段"
     ),
+    retrieval: RetrievalMode = typer.Option(
+        RetrievalMode.hybrid.value,
+        "--retrieval",
+        help="检索模式: hybrid（RRF 融合）/ vector（纯向量）/ fts（纯全文）",
+    ),
 ) -> None:
-    """向量检索 + LLM 回答。"""
+    """混合检索 + LLM 回答。"""
     settings = load_settings()
     init_pool(settings.database_url)
     try:
         from .qa import ask as do_ask
 
-        answer, hits = do_ask(settings, question)
+        answer, hits = do_ask(settings, question, mode=retrieval)
         typer.echo(answer)
         typer.echo()
         typer.secho("── 引用来源 ──", bold=True)
@@ -51,7 +57,7 @@ def ask(
         for i, h in enumerate(hits, 1):
             heading = f" › {h.heading}" if h.heading else ""
             typer.echo(
-                f"[{i}] {h.file_path}{heading}  (相似度 {h.similarity:.3f})"
+                f"[{i}] {h.file_path}{heading}  (score {h.score:.3f})"
             )
             if show_context:
                 typer.echo(f"    {h.content[:200]}...")

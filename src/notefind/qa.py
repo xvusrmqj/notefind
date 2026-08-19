@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI
 
 from .config import Settings
 from .embedding import embed_query, make_embedder
-from .retriever import SearchHit, vector_search
+from .retriever import RetrievalMode, SearchHit, hybrid_search
 
 SYSTEM_PROMPT = """\
 你是一个本地笔记检索助手。请仅根据下面的参考资料回答用户问题。
@@ -42,17 +42,31 @@ def build_qa_chain(settings: Settings) -> Runnable:
     return prompt | llm | StrOutputParser()
 
 
-def retrieve(settings: Settings, question: str) -> list[SearchHit]:
+def retrieve(
+    settings: Settings,
+    question: str,
+    mode: RetrievalMode = RetrievalMode.hybrid,
+) -> list[SearchHit]:
     embedder = make_embedder(
         settings.embed_base_url, settings.embed_model, settings.embed_api_key
     )
     query_vec = embed_query(embedder, question)
-    return vector_search(query_vec, k=settings.top_k)
+    return hybrid_search(
+        query_vec,
+        question,
+        k=settings.top_k,
+        tsv_config=settings.tsv_config,
+        mode=mode,
+    )
 
 
-def ask(settings: Settings, question: str) -> tuple[str, list[SearchHit]]:
+def ask(
+    settings: Settings,
+    question: str,
+    mode: RetrievalMode = RetrievalMode.hybrid,
+) -> tuple[str, list[SearchHit]]:
     """返回 (答案, 引用列表)。"""
-    hits = retrieve(settings, question)
+    hits = retrieve(settings, question, mode=mode)
     if not hits:
         return "数据库中没有可检索的笔记，请先运行 `notefind sync`。", []
     chain = build_qa_chain(settings)

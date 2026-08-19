@@ -45,14 +45,19 @@ NOTE_DIRS=zim:/home/olv/Notes/zim,obsidian:/home/olv/Notes/vault
 # 可选
 TOP_K=10
 EMBED_BATCH_SIZE=32
+# 全文检索分词配置（pg_jieba 的配置名为 jiebacfg，须与 migrate_002.py 一致）
+TSV_CONFIG=jiebacfg
 ```
 
 ### 4. 初始化数据库
 
 ```sh
 uv run python scripts/migrate_001.py   # 建表 + pgvector 索引
+uv run python scripts/migrate_002.py   # content_tsv 生成列 + GIN 索引（需先安装 pg_jieba）
 uv run python scripts/check_schema.py  # 校验 schema
 ```
+
+> pg_jieba 安装：apt 无预编译包时需源码编译（cmake + postgresql-server-dev-18），详见 docs/2-hybrid-search.md。
 
 ### 5. 同步笔记
 
@@ -70,10 +75,10 @@ uv run notefind sync
 uv run notefind ask "部署流程里数据库备份是怎么做的？"
 ```
 
-加 `--show-context` 同时显示检索到的原文片段：
+加 `--show-context` 同时显示检索到的原文片段；`--retrieval hybrid|vector|fts` 切换检索模式（默认 hybrid，RRF 融合）：
 
 ```sh
-uv run notefind ask "部署流程里数据库备份是怎么做的？" --show-context
+uv run notefind ask "部署流程里数据库备份是怎么做的？" --retrieval fts
 ```
 
 ### 7. 自检（可选）
@@ -86,7 +91,7 @@ uv run python scripts/selftest_embed.py  # embedding 服务连通性自检
 ## Roadmap
 
 - [x] 第一步：基础版 —— 扫描入库 + 向量检索 + CLI 问答（docs/1-basic.md）
-- [ ] 第二步：混合检索 —— 向量 + 全文 RRF 融合（docs/2-hybrid-search.md）
+- [x] 第二步：混合检索 —— 向量 + 全文 RRF 融合（docs/2-hybrid-search.md）
 - [ ] 第三步：Web UI —— 搜索 / 问答 / 同步管理（docs/3-web-ui.md）
 - [ ] 第四步：附件向量化 —— 用 LangChain loader 提取 PDF / Office 附件文本并入库（docs/4-attachments.md）
 

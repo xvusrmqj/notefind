@@ -44,6 +44,8 @@ class Settings(BaseSettings):
 
     note_dirs_raw: str = Field(default="", alias="NOTE_DIRS")
     top_k: int = 10
+    # 全文检索分词配置，须与 migrate_002.py 使用的一致（pg_jieba 的配置名为 jiebacfg）
+    tsv_config: str = Field(default="jiebacfg", alias="TSV_CONFIG")
     # CPU 推理建议小 batch（8 左右）+ 批间停顿，避免持续满载
     embed_batch_size: int = Field(default=8, ge=1, le=256)
     embed_pause_ms: int = Field(default=200, ge=0, le=10_000)

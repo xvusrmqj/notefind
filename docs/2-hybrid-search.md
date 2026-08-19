@@ -3,13 +3,24 @@
 目标：在向量检索基础上增加全文检索（tsvector），双路召回 + RRF 融合，
 提升专有名词、文件名、标签等关键词查询的召回质量。
 
-## 表结构变更
+中文分词统一使用 **pg_jieba** 扩展（不做其它兜底）。
+
+## 前置：安装 pg_jieba
+
+pg_jieba 需在 PostgreSQL 服务器侧安装（apt 包名视 PG 版本而定，如 `postgresql-16-jieba`；
+无预编译包时需源码编译），然后执行：
 
 ```sql
--- 全文检索生成列
+CREATE EXTENSION IF NOT EXISTS pg_jieba;
+```
+
+## 表结构变更（scripts/migrate_002.py，幂等）
+
+```sql
+-- 全文检索生成列（jieba 分词；注意 pg_jieba 的配置名是 jiebacfg）
 ALTER TABLE chunks
 ADD COLUMN content_tsv TSVECTOR GENERATED ALWAYS AS
-    (to_tsvector('simple', content)) STORED;
+    (to_tsvector('jiebacfg', content)) STORED;
 
 -- GIN 索引
 CREATE INDEX idx_chunks_content_tsv
@@ -17,8 +28,7 @@ ON chunks
 USING gin (content_tsv);
 ```
 
-> 注：中文全文检索 `simple` 分词效果有限，可后续考虑 `pg_jieba` / `zhparser` 扩展，
-> 或由应用层分词后拼接 `to_tsquery`。
+> 注：生成列表达式不可 ALTER；若列已存在但分词配置不同，需 DROP COLUMN 后重新添加（数据自动重算）。
 
 ## 检索流程
 
@@ -29,9 +39,9 @@ USING gin (content_tsv);
       ↓
 embedding(查询)
       ↓
-混合检索：
-  ├─ 向量 top-k（cosine，k=10）
-  └─ 全文 top-k（ts_rank，k=10）
+混合检索（hybrid_search，--retrieval 可切换单路）：
+  ├─ 向量 top-k（cosine，k=10）      --retrieval vector 时仅此路
+  └─ 全文 top-k（ts_rank，k=10）      --retrieval fts 时仅此路
       ↓
 RRF 融合两路结果（去重）
       ↓
@@ -47,20 +57,21 @@ RRF 融合两路结果（去重）
 ```sql
 WITH vec AS (
     SELECT id, ROW_NUMBER() OVER (
-        ORDER BY embedding <=> :query_vec
+        ORDER BY embedding <=> %(query_vec)s::vector
     ) AS rank
     FROM chunks
-    ORDER BY embedding <=> :query_vec
-    LIMIT 10
+    ORDER BY embedding <=> %(query_vec)s::vector
+    LIMIT %(k)s
 ),
 fts AS (
     SELECT id, ROW_NUMBER() OVER (
-        ORDER BY ts_rank(content_tsv, :query) DESC
+        ORDER BY ts_rank(content_tsv, query) DESC
     ) AS rank
-    FROM chunks
-    WHERE content_tsv @@ plainto_tsquery('simple', :query)
-    ORDER BY ts_rank(content_tsv, :query) DESC
-    LIMIT 10
+    FROM chunks,
+         plainto_tsquery(%(cfg)s::regconfig, %(q)s) AS query
+    WHERE content_tsv @@ query
+    ORDER BY ts_rank(content_tsv, query) DESC
+    LIMIT %(k)s
 )
 SELECT c.id, c.content, c.heading, d.file_path,
        COALESCE(1.0 / (60 + v.rank), 0) + COALESCE(1.0 / (60 + f.rank), 0) AS score
@@ -71,7 +82,36 @@ JOIN documents d ON d.id = c.document_id
 ORDER BY score DESC;
 ```
 
+> 参数：`cfg` 来自 `TSV_CONFIG`（默认 `jiebacfg`），`k` 来自 `TOP_K`（默认 10）。
+> `--retrieval vector` 时退化为纯向量 SQL，`--retrieval fts` 时退化为纯全文 SQL（`SearchHit.similarity` 改为通用 `score`）。
+
+## 配置
+
+```dotenv
+# 全文检索分词配置，须与迁移脚本使用的配置一致
+# pg_jieba 提供的配置: jiebacfg / jiebaqry / jiebamp / jiebahmm
+TSV_CONFIG=jiebacfg
+```
+
 ## 交付物
 
-- `notefind ask` 升级为混合检索，CLI 增加 `--no-fts` / `--no-vec` 开关便于对比效果
-- （可选）检索结果评分展示，便于调参（k、RRF 常数 60）
+- `scripts/migrate_002.py`：建 content_tsv 生成列（jieba）+ GIN 索引（幂等）
+- `scripts/check_schema.py`：校验 content_tsv 列与 GIN 索引
+- `src/notefind/retriever.py`：`hybrid_search()`（RRF 融合 + 单路退化）
+- `notefind ask` 升级为混合检索，CLI 增加 `--retrieval hybrid|vector|fts` 选项便于对比效果
+- 引用行展示 RRF score（保留 3 位小数），便于调参（k、RRF 常数 60）
+
+## 验证
+
+```sh
+uv run python scripts/migrate_002.py    # 建列 + 索引
+uv run python scripts/check_schema.py   # 校验 schema
+
+# 对比三路召回效果
+uv run notefind ask "备份" --retrieval vector  # 纯向量
+uv run notefind ask "备份" --retrieval fts     # 纯全文
+uv run notefind ask "备份" --retrieval hybrid  # 混合（RRF，默认）
+
+# 英文专名/文件名查询验证 FTS 路提升（如 RRF、excalidraw）
+uv run python scripts/selftest.py      # 端到端不回归
+```
