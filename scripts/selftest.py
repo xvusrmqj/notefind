@@ -1,6 +1,6 @@
 """快速自测：chunker + parsers。"""
-from notefind.chunker import split_markdown
-from notefind.parsers import parse_zim
+from notefind.core.chunker import split_markdown
+from notefind.core.parsers import parse_zim
 
 md = """# 项目 A
 

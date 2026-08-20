@@ -1,12 +1,12 @@
-"""CLI 入口：notefind sync / notefind ask。"""
+"""CLI 入口：notefind sync / ask / serve。"""
 
 from __future__ import annotations
 
 import typer
 
-from .config import load_settings
-from .db import close_pool, init_pool
-from .retriever import RetrievalMode
+from ..core.config import load_settings
+from ..core.db import close_pool, init_pool
+from ..core.retriever import RetrievalMode
 
 app = typer.Typer(help="notefind: 本地笔记 RAG 搜索", no_args_is_help=True)
 
@@ -17,7 +17,7 @@ def sync() -> None:
     settings = load_settings()
     init_pool(settings.database_url)
     try:
-        from .sync import sync_all
+        from ..core.sync import sync_all
 
         def _progress(idx: int, total: int, sf, action: str) -> None:
             typer.echo(f"[{idx}/{total}] {action:10s} {sf.file_path}")
@@ -46,7 +46,7 @@ def ask(
     settings = load_settings()
     init_pool(settings.database_url)
     try:
-        from .qa import ask as do_ask
+        from ..core.qa import ask as do_ask
 
         answer, hits = do_ask(settings, question, mode=retrieval)
         typer.echo(answer)
@@ -63,6 +63,17 @@ def ask(
                 typer.echo(f"    {h.content[:200]}...")
     finally:
         close_pool()
+
+
+@app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", help="监听地址（默认仅本机）"),
+    port: int = typer.Option(8000, help="监听端口"),
+) -> None:
+    """启动 Web UI（FastAPI，前端构建产物自动托管）。"""
+    import uvicorn
+
+    uvicorn.run("notefind.webapi.app:app", host=host, port=port)
 
 
 if __name__ == "__main__":

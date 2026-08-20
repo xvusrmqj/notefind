@@ -1,6 +1,6 @@
 """自测：embedding 客户端（查询前缀 + 批量文档）。"""
-from notefind.config import load_settings
-from notefind.embedding import embed_documents_batched, embed_query, make_embedder
+from notefind.core.config import load_settings
+from notefind.core.embedding import embed_documents_batched, embed_query, make_embedder
 
 s = load_settings()
 e = make_embedder(s.embed_base_url, s.embed_model, s.embed_api_key)

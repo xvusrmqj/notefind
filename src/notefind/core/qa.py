@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
@@ -74,3 +76,22 @@ def ask(
         {"question": question, "context": _format_context(hits)}
     )
     return answer, hits
+
+
+def ask_stream(
+    settings: Settings,
+    question: str,
+    mode: RetrievalMode = RetrievalMode.hybrid,
+) -> tuple[list[SearchHit], Iterator[str]]:
+    """流式问答：返回 (引用列表, token 迭代器)。
+
+    检索（阻塞）先完成，随后 chain.stream() 逐 token 产出答案增量。
+    """
+    hits = retrieve(settings, question, mode=mode)
+    if not hits:
+        return [], iter(["数据库中没有可检索的笔记，请先运行 `notefind sync`。"])
+    chain = build_qa_chain(settings)
+    tokens = chain.stream(
+        {"question": question, "context": _format_context(hits)}
+    )
+    return hits, tokens

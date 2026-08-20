@@ -81,7 +81,25 @@ uv run notefind ask "部署流程里数据库备份是怎么做的？"
 uv run notefind ask "部署流程里数据库备份是怎么做的？" --retrieval fts
 ```
 
-### 7. 自检（可选）
+### 7. Web UI
+
+首次需要构建前端（需 Node.js）：
+
+```sh
+cd web && npm install && npm run build
+```
+
+启动服务（仅绑定 127.0.0.1，浏览器访问 http://127.0.0.1:8000）：
+
+```sh
+uv run notefind serve
+```
+
+功能：问答（SSE 流式 + 引用展开原文）、纯检索（hybrid/vector/fts）、同步管理（后台任务 + 进度）、文档浏览。
+
+前端开发模式（可选，热更新）：一个终端跑 `uv run notefind serve`，另一个终端 `cd web && npm run dev`，访问 http://localhost:5173（Vite 会把 `/api` 代理到 `127.0.0.1:8000`）。
+
+### 8. 自检（可选）
 
 ```sh
 uv run python scripts/selftest.py        # 端到端自检
@@ -92,7 +110,7 @@ uv run python scripts/selftest_embed.py  # embedding 服务连通性自检
 
 - [x] 第一步：基础版 —— 扫描入库 + 向量检索 + CLI 问答（docs/1-basic.md）
 - [x] 第二步：混合检索 —— 向量 + 全文 RRF 融合（docs/2-hybrid-search.md）
-- [ ] 第三步：Web UI —— 搜索 / 问答 / 同步管理（docs/3-web-ui.md）
+- [x] 第三步：Web UI —— 搜索 / 问答 / 同步管理（docs/3-web-ui.md）
 - [ ] 第四步：附件向量化 —— 用 LangChain loader 提取 PDF / Office 附件文本并入库（docs/4-attachments.md）
 
 thinking：

@@ -37,7 +37,7 @@ fts AS (
     ORDER BY ts_rank(content_tsv, query) DESC
     LIMIT %(k)s
 )
-SELECT c.content, c.heading, d.file_path,
+SELECT c.id AS chunk_id, c.content, c.heading, d.file_path,
        COALESCE(1.0 / (60 + v.rank), 0) + COALESCE(1.0 / (60 + f.rank), 0) AS score
 FROM vec v
 FULL JOIN fts f USING (id)
@@ -48,7 +48,7 @@ LIMIT %(k)s
 """
 
 VECTOR_SQL = """
-SELECT c.content, c.heading, d.file_path,
+SELECT c.id AS chunk_id, c.content, c.heading, d.file_path,
        1 - (c.embedding <=> %(query_vec)s::vector) AS score
 FROM chunks c
 JOIN documents d ON d.id = c.document_id
@@ -57,7 +57,7 @@ LIMIT %(k)s
 """
 
 FTS_SQL = """
-SELECT c.content, c.heading, d.file_path,
+SELECT c.id AS chunk_id, c.content, c.heading, d.file_path,
        ts_rank(c.content_tsv, query) AS score
 FROM chunks c
 JOIN documents d ON d.id = c.document_id,
@@ -70,6 +70,7 @@ LIMIT %(k)s
 
 @dataclass
 class SearchHit:
+    chunk_id: int
     content: str
     heading: str | None
     file_path: str
@@ -99,6 +100,7 @@ def hybrid_search(
             cur.execute(sql, params)
             return [
                 SearchHit(
+                    chunk_id=r["chunk_id"],
                     content=r["content"],
                     heading=r["heading"],
                     file_path=r["file_path"],
