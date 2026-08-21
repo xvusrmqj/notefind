@@ -54,6 +54,7 @@ TSV_CONFIG=jiebacfg
 ```sh
 uv run python scripts/migrate_001.py   # 建表 + pgvector 索引
 uv run python scripts/migrate_002.py   # content_tsv 生成列 + GIN 索引（需先安装 pg_jieba）
+uv run python scripts/migrate_003.py   # 附件字段：kind / mime_type / referenced_by
 uv run python scripts/check_schema.py  # 校验 schema
 ```
 
@@ -111,7 +112,7 @@ uv run python scripts/selftest_embed.py  # embedding 服务连通性自检
 - [x] 第一步：基础版 —— 扫描入库 + 向量检索 + CLI 问答（docs/1-basic.md）
 - [x] 第二步：混合检索 —— 向量 + 全文 RRF 融合（docs/2-hybrid-search.md）
 - [x] 第三步：Web UI —— 搜索 / 问答 / 同步管理（docs/3-web-ui.md）
-- [ ] 第四步：附件向量化 —— 用 LangChain loader 提取 PDF / Office 附件文本并入库（docs/4-attachments.md）
+- [x] 第四步：附件向量化 —— 笔记中引用的 PDF/docx 附件提取文本并入库（docs/4-attachments.md）
 
 thinking：
 - 笔记更新， 数据库中的向量怎么更新？

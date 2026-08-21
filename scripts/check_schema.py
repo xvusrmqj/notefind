@@ -34,4 +34,12 @@ assert cur.fetchone(), "缺少 GIN 索引 idx_chunks_content_tsv"
 cur = conn.execute("SELECT 1 FROM pg_extension WHERE extname='pg_jieba'")
 assert cur.fetchone(), "缺少 pg_jieba 扩展"
 
-print("schema 校验通过：content_tsv + GIN 索引 + pg_jieba 均就绪")
+# 第四步：附件字段校验
+for col in ("kind", "mime_type", "referenced_by"):
+    cur = conn.execute(
+        "SELECT 1 FROM information_schema.columns "
+        f"WHERE table_name='documents' AND column_name='{col}'"
+    )
+    assert cur.fetchone(), f"缺少 documents.{col}（运行 scripts/migrate_003.py）"
+
+print("schema 校验通过：content_tsv + GIN 索引 + pg_jieba + 附件字段均就绪")

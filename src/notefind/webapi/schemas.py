@@ -24,6 +24,9 @@ class Citation(BaseModel):
     heading: str | None = None
     score: float
     content: str
+    kind: str = "note"  # 'note' | 'attachment'
+    mime_type: str | None = None
+    referenced_by: list[int] | None = None  # 引用该附件的笔记 document_id
 
 
 class SearchResponse(BaseModel):

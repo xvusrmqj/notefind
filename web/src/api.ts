@@ -6,6 +6,9 @@ export interface Citation {
   heading: string | null;
   score: number;
   content: string;
+  kind?: "note" | "attachment";
+  mime_type?: string | null;
+  referenced_by?: number[] | null;
 }
 
 export interface SyncStatus {

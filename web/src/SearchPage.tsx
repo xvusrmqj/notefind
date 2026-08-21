@@ -75,7 +75,8 @@ export default function SearchPage() {
                   className="source"
                   onClick={() => setExpanded(expanded === c.chunk_id ? null : c.chunk_id)}
                 >
-                  [{i + 1}] {c.file_path}
+                  [{i + 1}] {c.kind === "attachment" && <span className="attach-tag">附件</span>}
+                  {c.file_path}
                   {c.heading ? ` › ${c.heading}` : ""}
                 </span>
                 <span>score {c.score.toFixed(3)}</span>

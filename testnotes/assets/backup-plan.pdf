@@ -1,0 +1,62 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 8 0 R 11 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Length 105 >>
+stream
+BT /F1 10 Tf 20 700 Td (Backup Strategy Page 1: Daily full database backup via pg_dump at 2am UTC.) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 3 0 R /Resources << /Font << /F1 4 0 R >> >>
+endobj
+6 0 obj
+<< /Length 107 >>
+stream
+BT /F1 10 Tf 20 700 Td (Page 2: Weekly base backup plus continuous WAL archiving to offsite storage.) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+8 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 6 0 R /Resources << /Font << /F1 7 0 R >> >>
+endobj
+9 0 obj
+<< /Length 106 >>
+stream
+BT /F1 10 Tf 20 700 Td (Page 3: Restore procedure: pg_restore base backup then replay WAL archives.) Tj ET
+endstream
+endobj
+10 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 9 0 R /Resources << /Font << /F1 10 0 R >> >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000128 00000 n 
+0000000284 00000 n 
+0000000354 00000 n 
+0000000477 00000 n 
+0000000635 00000 n 
+0000000705 00000 n 
+0000000828 00000 n 
+0000000985 00000 n 
+0000001056 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+1181
+%%EOF

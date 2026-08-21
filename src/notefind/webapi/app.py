@@ -64,6 +64,9 @@ def _citation(h: SearchHit) -> Citation:
         heading=h.heading,
         score=h.score,
         content=h.content,
+        kind=h.kind,
+        mime_type=h.mime_type,
+        referenced_by=h.referenced_by,
     )
 
 

@@ -15,8 +15,8 @@ from .chunker import Chunk, split_markdown
 from .config import Settings
 from .db import get_pool
 from .embedding import embed_documents_batched, make_embedder
-from .parsers import parse_file
-from .scanner import ScannedFile, scan_dir, sha256_of
+from .parsers import ATTACH_MIME, extract_attachment, parse_file
+from .scanner import ScannedFile, find_attachments, scan_dir, sha256_of
 
 
 @dataclass
@@ -69,19 +69,26 @@ def _upsert_document(
     chunks: list[Chunk],
     vectors: list[list[float]],
     existing_id: int | None,
+    referenced_by: list[int] | None = None,
 ) -> None:
     """单文档一个事务：新增或更新 document + chunks。"""
     mtime = datetime.fromtimestamp(sf.mtime, tz=timezone.utc)
+    mime = ATTACH_MIME.get(sf.path.suffix.lower()) if sf.kind == "attachment" else None
     with conn.transaction():
         if existing_id is None:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO documents (file_path, file_name, source_type, content_hash, mtime)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO documents
+                        (file_path, file_name, source_type, content_hash, mtime,
+                         kind, mime_type, referenced_by)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
-                    (sf.file_path, sf.path.name, sf.source_type, content_hash, mtime),
+                    (
+                        sf.file_path, sf.path.name, sf.source_type, content_hash, mtime,
+                        sf.kind, mime, referenced_by,
+                    ),
                 )
                 existing_id = cur.fetchone()[0]
         else:
@@ -90,12 +97,39 @@ def _upsert_document(
                 cur.execute(
                     """
                     UPDATE documents
-                    SET file_name = %s, source_type = %s, content_hash = %s, mtime = %s
+                    SET file_name = %s, source_type = %s, content_hash = %s, mtime = %s,
+                        kind = %s, mime_type = %s, referenced_by = %s
                     WHERE id = %s
                     """,
-                    (sf.path.name, sf.source_type, content_hash, mtime, existing_id),
+                    (
+                        sf.path.name, sf.source_type, content_hash, mtime,
+                        sf.kind, mime, referenced_by, existing_id,
+                    ),
                 )
         _insert_chunks(conn, existing_id, chunks, vectors)
+
+
+def _attachment_chunks(sf: ScannedFile) -> list[Chunk]:
+    """附件提取：PDF 逐页预切（页码写入 heading），再走通用切分。"""
+    pages = extract_attachment(sf.path)
+    if pages is None:
+        raise ValueError(f"不支持的附件类型: {sf.path.suffix}")
+    chunks: list[Chunk] = []
+    idx = 0
+    for page in pages:
+        if not page.content:
+            continue
+        heading = f"p.{page.page}" if page.page is not None else None
+        for c in split_markdown(page.content):
+            chunks.append(
+                Chunk(
+                    chunk_index=idx,
+                    heading=heading if heading else c.heading,
+                    content=c.content,
+                )
+            )
+            idx += 1
+    return chunks
 
 
 def sync_all(settings: Settings, progress=None) -> SyncStats:
@@ -113,6 +147,17 @@ def sync_all(settings: Settings, progress=None) -> SyncStats:
         scanned: list[ScannedFile] = []
         for note_dir in settings.note_dirs:
             scanned.extend(scan_dir(note_dir))
+
+        # 1.5 附件发现：解析笔记中的显式引用（![[x.pdf]] / [a](x.docx) / zim {{x.pdf}}）
+        attach_refs = find_attachments(scanned)
+        for apath in attach_refs:
+            p = Path(apath)
+            scanned.append(
+                ScannedFile(
+                    path=p, source_type="attachment", mtime=p.stat().st_mtime,
+                    kind="attachment",
+                )
+            )
         stats.scanned = len(scanned)
         disk_paths = {sf.file_path for sf in scanned}
 
@@ -152,8 +197,11 @@ def sync_all(settings: Settings, progress=None) -> SyncStats:
                     _report(progress, idx, total, sf, "skip(hash)")
                     continue
 
-                parsed = parse_file(sf.path, sf.source_type)
-                chunks = split_markdown(parsed.markdown)
+                if sf.kind == "attachment":
+                    chunks = _attachment_chunks(sf)
+                else:
+                    parsed = parse_file(sf.path, sf.source_type)
+                    chunks = split_markdown(parsed.markdown)
                 if not chunks:
                     # 空文档也记录，避免每次重扫
                     _upsert_document(conn, sf, content_hash, [], [], row["id"] if row else None)
@@ -182,9 +230,32 @@ def sync_all(settings: Settings, progress=None) -> SyncStats:
             finally:
                 _report(progress, idx, total, sf, action)
 
+        # 4. 回填 referenced_by：附件 -> 引用它的笔记 document_id 列表
+        #    （全量重算，能正确处理笔记增删引用链的情况）
+        if attach_refs:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, file_path FROM documents WHERE kind = 'note'")
+                path_to_id = {row[1]: row[0] for row in cur.fetchall()}
+            for apath, note_paths in attach_refs.items():
+                ids = sorted(
+                    {path_to_id[str(p)] for p in note_paths if str(p) in path_to_id}
+                )
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE documents SET referenced_by = %s WHERE file_path = %s",
+                        (ids, apath),
+                    )
+
     return stats
 
 
 def _report(progress, idx: int, total: int, sf: ScannedFile, action: str) -> None:
     if progress is not None:
         progress(idx, total, sf, action)
+
+
+def _flatten(paths) -> list[Path]:
+    out: list[Path] = []
+    for lst in paths:
+        out.extend(lst)
+    return out

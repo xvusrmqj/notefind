@@ -24,6 +24,51 @@ def parse_file(path: Path, source_type: str) -> ParsedDoc:
     return parse_markdown(text)
 
 
+# ---------------------------------------------------------------- 附件提取
+
+# 支持提取文本的附件后缀 -> MIME 类型
+ATTACH_MIME: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".json": "application/json",
+}
+
+
+@dataclass
+class ExtractedPage:
+    """附件提取出的一个单元（PDF 一页 / docx 整篇）。"""
+
+    content: str
+    page: int | None = None  # 1-based 页码，非分页文档为 None
+
+
+def extract_attachment(path: Path) -> list[ExtractedPage] | None:
+    """按后缀分发提取附件文本；不支持的类型返回 None（调用方跳过）。
+
+    提取失败抛异常，由 sync 记 warning 不阻塞。
+    """
+    suffix = path.suffix.lower()
+    if suffix == ".pdf":
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(path))
+        return [
+            ExtractedPage(content=(page.extract_text() or "").strip(), page=i)
+            for i, page in enumerate(reader.pages, 1)
+        ]
+    if suffix == ".docx":
+        import docx2txt
+
+        text = docx2txt.process(str(path)).strip()
+        return [ExtractedPage(content=text)]
+    if suffix in (".txt", ".csv", ".json"):
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+        return [ExtractedPage(content=text)]
+    return None
+
+
 # ---------------------------------------------------------------- markdown
 
 FRONT_MATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)

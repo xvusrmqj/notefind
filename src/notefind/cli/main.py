@@ -56,8 +56,9 @@ def ask(
             typer.echo("（无）")
         for i, h in enumerate(hits, 1):
             heading = f" › {h.heading}" if h.heading else ""
+            kind_tag = "[附件] " if h.kind == "attachment" else ""
             typer.echo(
-                f"[{i}] {h.file_path}{heading}  (score {h.score:.3f})"
+                f"[{i}] {kind_tag}{h.file_path}{heading}  (score {h.score:.3f})"
             )
             if show_context:
                 typer.echo(f"    {h.content[:200]}...")

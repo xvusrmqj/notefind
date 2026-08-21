@@ -38,6 +38,7 @@ fts AS (
     LIMIT %(k)s
 )
 SELECT c.id AS chunk_id, c.content, c.heading, d.file_path,
+       d.kind, d.mime_type, d.referenced_by,
        COALESCE(1.0 / (60 + v.rank), 0) + COALESCE(1.0 / (60 + f.rank), 0) AS score
 FROM vec v
 FULL JOIN fts f USING (id)
@@ -49,6 +50,7 @@ LIMIT %(k)s
 
 VECTOR_SQL = """
 SELECT c.id AS chunk_id, c.content, c.heading, d.file_path,
+       d.kind, d.mime_type, d.referenced_by,
        1 - (c.embedding <=> %(query_vec)s::vector) AS score
 FROM chunks c
 JOIN documents d ON d.id = c.document_id
@@ -58,6 +60,7 @@ LIMIT %(k)s
 
 FTS_SQL = """
 SELECT c.id AS chunk_id, c.content, c.heading, d.file_path,
+       d.kind, d.mime_type, d.referenced_by,
        ts_rank(c.content_tsv, query) AS score
 FROM chunks c
 JOIN documents d ON d.id = c.document_id,
@@ -75,6 +78,9 @@ class SearchHit:
     heading: str | None
     file_path: str
     score: float
+    kind: str = "note"  # 'note' | 'attachment'
+    mime_type: str | None = None
+    referenced_by: list[int] | None = None  # 引用该附件的笔记 document_id
 
 
 def hybrid_search(
@@ -105,6 +111,9 @@ def hybrid_search(
                     heading=r["heading"],
                     file_path=r["file_path"],
                     score=float(r["score"]),
+                    kind=r.get("kind") or "note",
+                    mime_type=r.get("mime_type"),
+                    referenced_by=list(r["referenced_by"]) if r.get("referenced_by") else None,
                 )
                 for r in cur.fetchall()
             ]
